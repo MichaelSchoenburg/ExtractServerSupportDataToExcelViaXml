@@ -137,7 +137,7 @@ try {
             $result = $host.ui.PromptForChoice( $title, $question, $options, 0 )
 
             if ($result -ne 0) {
-                $PathToExcelFile = $ExcelFiles[$result]
+                $PathToExcelFile = $ExcelFiles[$result-1]
                 Write-Host "Sie haben die Excel-Datei Nr. $($result) gewaehlt. Das Skript wird die extrahierten Daten in die Excel-Datei '$($PathToExcelFile)' schreiben."
             } elseif ($result -eq 0) {
                 throw "Sie haben das Skript abgebrochen. Es wrude keine Excel-Datei per Parameter angegeben und die gefundene Excel-Datei wollten Sie nicht verwenden. Bitte spezifizieren Sie welche Excel-Datei genutzt werden soll, indem Sie diese im Parameter -PathToExcelFile angeben oder die Excel-Datei in den Ordner verschieben, wo das Skript gestartet wird oder einen der Unterordner."
@@ -150,15 +150,15 @@ try {
     #endregion
 
     #region ZIP-Dateien-Extraktion
-    Write-Host "Schritt 1 von 6: Pruefe, ob ein temporaeres Verzeichnis fuer die Extraktion der ZIP- und XML-Dateien existiert..."
+    Write-Verbose "Schritt 1 von 6: Pruefe, ob ein temporaeres Verzeichnis fuer die Extraktion der ZIP- und XML-Dateien existiert..."
     if (-not (Test-Path $baseTempDir)) {
-        Write-Host "Schritt 1 von 6: Dies wurde nicht gefunden. Erstelle ein temporaeres Verzeichnis fuer die Extraktion der ZIP- und XML-Dateien..."
+        Write-Verbose "Schritt 1 von 6: Dies wurde nicht gefunden. Erstelle ein temporaeres Verzeichnis fuer die Extraktion der ZIP- und XML-Dateien..."
         New-Item -ItemType Directory -Path $baseTempDir | Out-Null
     } else {
-        Write-Host "Schritt 1 von 6: Wurde gefunden. Existiert bereits."
+        Write-Verbose "Schritt 1 von 6: Wurde gefunden. Existiert bereits."
     }
 
-    Write-Host "Schritt 2 von 6: Starte die Extraktion aller ZIP-Dateien im Verzeichnis '$($ZipFilesDirectory)'..."
+    Write-Verbose "Schritt 2 von 6: Starte die Extraktion aller ZIP-Dateien im Verzeichnis '$($ZipFilesDirectory)'..."
     $zipFiles = Get-ChildItem -Path $ZipFilesDirectory -Filter "*.zip" -File -Recurse
     $XmlFiles = New-Object System.Collections.Generic.List[object]
     $n = 0
@@ -212,14 +212,14 @@ try {
     if (-not $XmlFiles -or $XmlFiles.Count -eq 0) {
         throw "Es wurde keine einzige XML-Dateie in den ZIP-Archiven gefunden. Somit koennen keine Daten gelesen werden. Skript wird beendet."
     } else {
-        Write-Host "Schritt 2 von 6: Extraktion abgeschlossen. Insgesamt $($XmlFiles.Count) XML-Dateien gefunden und extrahiert."
+        Write-Verbose "Schritt 2 von 6: Extraktion abgeschlossen. Insgesamt $($XmlFiles.Count) XML-Dateien gefunden und extrahiert."
     }
 
     #endregion
 
     #region XML-Parsing
 
-    Write-Host "Schritt 3 von 6: Parse Daten aus den XML-Dateien aus..."
+    Write-Verbose "Schritt 3 von 6: Parse Daten aus den XML-Dateien aus..."
 
     $XmlsData = New-Object System.Collections.Generic.List[PSCustomObject]
 
@@ -314,21 +314,21 @@ try {
         $XmlsData += $xmlData
     }
 
-    Write-Host "Schritt 3 von 6: Alle XML-Dateien geparst."
+    Write-Verbose "Schritt 3 von 6: Alle XML-Dateien geparst."
 
     #endregion
 
     
     #region Excel-Initialisierung
 
-    Write-Host "Schritt 4 von 6: Initialisiere Excel..."
+    Write-Verbose "Schritt 4 von 6: Initialisiere Excel..."
     $excel = New-Object -ComObject Excel.Application
 
     if ($Silent) {
-        Write-Host "Schritt 4 von 6: Das Skript wurde nicht im Silent-Modus gestartet. Excel wird angezeigt. Wenn du das nicht moechtest, starte das Skript das naechste Mal mit dem Parameter -Silent."
+        Write-Verbose "Schritt 4 von 6: Das Skript wurde nicht im Silent-Modus gestartet. Excel wird angezeigt. Wenn du das nicht moechtest, starte das Skript das naechste Mal mit dem Parameter -Silent."
         $excel.Visible = $false
     } else {
-        Write-Host "Schritt 4 von 6: Das Skript wurde im Silent-Modus gestartet. Excel wird nicht angezeigt. Wenn du die Excel-Datei live sehen moechtest, waehrend die Daten eingetragen werden, starte das Skript das naechste Mal ohne den Parameter -Silent."
+        Write-Verbose "Schritt 4 von 6: Das Skript wurde im Silent-Modus gestartet. Excel wird nicht angezeigt. Wenn du die Excel-Datei live sehen moechtest, waehrend die Daten eingetragen werden, starte das Skript das naechste Mal ohne den Parameter -Silent."
         $excel.Visible = $true
     }
     
@@ -336,33 +336,40 @@ try {
     $excelFullPath = Resolve-Path -Path $PathToExcelFile | Select-Object -ExpandProperty Path
     $workbook = $excel.Workbooks.Open($excelFullPath)
 
-    Write-Host "Schritt 4 von 6: Excel-Initialisierung abgeschlossen."
+    Write-Verbose "Schritt 4 von 6: Excel-Initialisierung abgeschlossen."
 
     #endregion
 
     #region Excel-Schreiben
 
-    Write-Host "Schritt 5 von 6: Schreibe Daten in Excel-Datei..."
+    Write-Verbose "Schritt 5 von 6: Schreibe Daten in Excel-Datei..."
 
     foreach ($myXmlData in $XmlsData) {
-        Write-Host "--------------------------------------------------------------------------"
-        Write-Host "Arbeitsblatt 10 auswaehlen..."
+        $progressParams = @{
+            Activity = "Schritt 5 von 6: Schreibe Daten in Excel-Datei..."
+            Status   = "Schreibe Daten von '$($myXmlData.Servername)' in Excel..."
+            PercentComplete = ($XmlsData.IndexOf($myXmlData) / $XmlsData.Count) * 100
+        }
+        Write-Progress @progressParams
+
+        Write-Verbose "--------------------------------------------------------------------------"
+        Write-Verbose "Arbeitsblatt 10 auswaehlen..."
         $worksheet = $workbook.Worksheets.Item(10)
         $lastRow = $worksheet.UsedRange.Rows.Count
 
-        Write-Host "Trage Daten in Excel (Arbeitsblatt 'Geraete Interface MAC') ein..."
+        Write-Verbose "Trage Daten in Excel (Arbeitsblatt 'Geraete Interface MAC') ein..."
         $ServerRow = $null
         for ($i = 3; $i -le $lastRow; $i++) {
             $cellValue = $worksheet.Cells.Item($i, 3).Value2
             if ($cellValue -eq $myXmlData.Servername) {
-                Write-Host "Servername '$($myXmlData.Servername)' gefunden in Zeile $i"
+                Write-Verbose "Servername '$($myXmlData.Servername)' gefunden in Zeile $i"
                 $ServerRow = $i
                 break
             }
         }
         if (-not $ServerRow) {
             # Suche die naechste komplett leere Zeile ab Zeile 3
-            Write-Host "Finde freie Zeile und trage Servername '$($myXmlData.Servername)' ein..."
+            Write-Verbose "Finde freie Zeile und trage Servername '$($myXmlData.Servername)' ein..."
             for ($i = 3; $i -le ($lastRow + 1000); $i++) {
                 $rowIsEmpty = $true
                 for ($col = 1; $col -le $worksheet.UsedRange.Columns.Count; $col++) {
@@ -373,9 +380,9 @@ try {
                 }
                 if ($rowIsEmpty) {
                     $ServerRow = $i
-                    Write-Host "Trage Servername '$($myXmlData.Servername)' in neue Zeile $ServerRow Spalte 3 ein..."
+                    Write-Verbose "Trage Servername '$($myXmlData.Servername)' in neue Zeile $ServerRow Spalte 3 ein..."
                     $worksheet.Cells.Item($ServerRow, 3).Value2 = $myXmlData.Servername
-                    Write-Host "Servername '$($myXmlData.Servername)' in neue Zeile $ServerRow eingetragen."
+                    Write-Verbose "Servername '$($myXmlData.Servername)' in neue Zeile $ServerRow eingetragen."
                     break
                 }
             }
@@ -385,38 +392,38 @@ try {
         }
 
         # Geraet
-        Write-Host "Trage Model '$($myXmlData.Model)' in Zeile $ServerRow, Spalte 4 mit der ueberschrift 'Geraet' ein..."
+        Write-Verbose "Trage Model '$($myXmlData.Model)' in Zeile $ServerRow, Spalte 4 mit der ueberschrift 'Geraet' ein..."
         $worksheet.Cells.Item($ServerRow, 4).Value2 = $myXmlData.Model
 
         # MAC Address > MAC
-        Write-Host "Trage iDrac-MAC-Adresse '$($myXmlData.ServerMacAddress)' in Zeile $ServerRow, Spalte 6 ein..."
+        Write-Verbose "Trage iDrac-MAC-Adresse '$($myXmlData.ServerMacAddress)' in Zeile $ServerRow, Spalte 6 ein..."
         $worksheet.Cells.Item($ServerRow, 6).Value2 = $myXmlData.ServerMacAddress
 
         # MAC Address > User / PW
-        Write-Host "Trage Benutzer und Passwort in Zeile $ServerRow, Spalte 7 ein..."
+        Write-Verbose "Trage Benutzer und Passwort in Zeile $ServerRow, Spalte 7 ein..."
         $worksheet.Cells.Item($ServerRow, 7).Value2 = "root/calvin"
 
         # Firmware > Port 1
-        Write-Host "Finde die MAC-Adresse von Embedded 1 Port 1..."
+        Write-Verbose "Finde die MAC-Adresse von Embedded 1 Port 1..."
         $FirmwarePort1MacAddress = $myXmlData.Nics.Where({ $_.DeviceDescription -like "*Embedded*NIC 1*Port 1*" })."MACAddress"
-        Write-Host "Trage MAC-Adresse '$FirmwarePort1MacAddress' von Embedded NIC 1 Port 1 in Zeile $ServerRow, Spalte 8 ein..."
+        Write-Verbose "Trage MAC-Adresse '$FirmwarePort1MacAddress' von Embedded NIC 1 Port 1 in Zeile $ServerRow, Spalte 8 ein..."
         $worksheet.Cells.Item($ServerRow, 8).Value2 = $FirmwarePort1MacAddress
 
         # Firmware > Port 2
-        Write-Host "Finde die MAC-Adresse von Embedded NIC 1 Port 2..."
+        Write-Verbose "Finde die MAC-Adresse von Embedded NIC 1 Port 2..."
         $FirmwarePort2MacAddress = $myXmlData.Nics.Where({ $_.DeviceDescription -like "*Embedded*NIC 1*Port 2*" })."MACAddress"
-        Write-Host "Trage MAC-Adresse '$FirmwarePort2MacAddress' von Embedded NIC 1 Port 2 in Zeile $ServerRow, Spalte 9 ein..."
+        Write-Verbose "Trage MAC-Adresse '$FirmwarePort2MacAddress' von Embedded NIC 1 Port 2 in Zeile $ServerRow, Spalte 9 ein..."
         $worksheet.Cells.Item($ServerRow, 9).Value2 = $FirmwarePort2MacAddress
 
         # Netzwerkkarten 100 G QSFP
-        Write-Host "Bereite 100 G QSFP-Netzwerkkarten vor..."
+        Write-Verbose "Bereite 100 G QSFP-Netzwerkkarten vor..."
         $Nics100G = $myXmlData.Nics.Where({ $_.PortSpeed -eq "100 G QSFP" })
         $j = 0
         foreach ($nic in $Nics100G) {
-            Write-Host "Trage Name von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($j) ein..."
+            Write-Verbose "Trage Name von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($j) ein..."
             $worksheet.Cells.Item($ServerRow, 10 + $j).Value2 = $nic.DeviceDescription
             $j += 1
-            Write-Host "Trage MAC-Adresse von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($j) ein..."
+            Write-Verbose "Trage MAC-Adresse von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($j) ein..."
             $worksheet.Cells.Item($ServerRow, 10 + $j).Value2 = $nic.MACAddress
             $j += 1
         }
@@ -425,30 +432,30 @@ try {
         $Nics1025G = $myXmlData.Nics.Where({ $_.PortSpeed -eq "10/25 GbE SFP" })
         $n = 0
         foreach ($nic in $Nics1025G) {
-            Write-Host "Trage Name von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($n) ein..."
+            Write-Verbose "Trage Name von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($n) ein..."
             $worksheet.Cells.Item($ServerRow, 26 + $n).Value2 = $nic.DeviceDescription
             $n += 1
-            Write-Host "Trage MAC-Adresse von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($n) ein..."
+            Write-Verbose "Trage MAC-Adresse von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($n) ein..."
             $worksheet.Cells.Item($ServerRow, 26 + $n).Value2 = $nic.MACAddress
             $n += 1
         }
 
         # Netzwerkkarten InfiniBand
-        Write-Host "Bereite InfiniBand-Netzwerkkarten vor..."
+        Write-Verbose "Bereite InfiniBand-Netzwerkkarten vor..."
         $NicsInfiniBand = $myXmlData.Nics.Where({ $_.PortSpeed -eq "InfiniBand" })
         $m = 0
         foreach ($nic in $NicsInfiniBand) {
-            Write-Host "Trage Name von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($m) ein..."
+            Write-Verbose "Trage Name von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($m) ein..."
             $worksheet.Cells.Item($ServerRow, 42 + $m).Value2 = $nic.DeviceDescription
             $m += 1
-            Write-Host "Trage MAC-Adresse von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($m) ein..."
+            Write-Verbose "Trage MAC-Adresse von $($nic.DeviceDescription) in Zeile $($ServerRow), Spalte $($m) ein..."
             $worksheet.Cells.Item($ServerRow, 42 + $m).Value2 = $nic.MACAddress
             $m += 1
         }
 
         # Physical Disks / HW&Disk Serial Nr.
-        Write-Host "----------------------------------------"
-        Write-Host "Trage Daten in Excel (Arbeitsblatt 'HW&Disk Serial Nr.') ein..."
+        Write-Verbose "----------------------------------------"
+        Write-Verbose "Trage Daten in Excel (Arbeitsblatt 'HW&Disk Serial Nr.') ein..."
         $worksheet = $workbook.Worksheets.Item(9)
         $lastRow = $worksheet.UsedRange.Rows.Count
         # Setze Hintergrundfarbe der Zellen (Spalten 3 bis 7 in der neuen Zeile) auf Grau
@@ -504,14 +511,14 @@ try {
         }
     }
 
-    Write-Host "Schritt 5 von 6: Alle Daten in die Excel-Datei uebertragen..."
+    Write-Verbose "Schritt 5 von 6: Alle Daten in die Excel-Datei uebertragen..."
 
     #endregion
 
 } finally {
     #region Aufraeumen
 
-    Write-Host "Schritt 6 von 6: Schliesse Excel-Datei und raeume extrahierte Dateien auf..."
+    Write-Verbose "Schritt 6 von 6: Schliesse Excel-Datei und raeume extrahierte Dateien auf..."
 
     # Excel schliessen
     if ($workbook) {
