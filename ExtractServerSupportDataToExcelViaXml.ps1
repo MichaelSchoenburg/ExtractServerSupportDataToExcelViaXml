@@ -466,6 +466,8 @@ try {
         # Server-Eckdaten
         $worksheet.Cells.Item($lastRow + 2,3).Value2 = $myXmlData.Servername
         $worksheet.Cells.Item($lastRow + 2,3).Font.Bold = $true
+        $worksheet.Cells.Item($lastRow + 2,4).Value2 = $myXmlData.Model
+        $worksheet.Cells.Item($lastRow + 2,4).Font.Bold = $true
         $worksheet.Cells.Item($lastRow + 2,7).Value2 = $myXmlData.ChassisServiceTag
         $worksheet.Cells.Item($lastRow + 2,7).Font.Bold = $true
 
