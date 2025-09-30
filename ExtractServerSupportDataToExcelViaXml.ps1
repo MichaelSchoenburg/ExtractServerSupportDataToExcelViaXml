@@ -382,6 +382,7 @@ try {
                     $ServerRow = $i
                     Write-Verbose "Trage Servername '$($myXmlData.Servername)' in neue Zeile $ServerRow Spalte 3 ein..."
                     $worksheet.Cells.Item($ServerRow, 3).Value2 = $myXmlData.Servername
+                    $worksheet.Cells.Item($ServerRow, 3).Font.Bold = $true
                     Write-Verbose "Servername '$($myXmlData.Servername)' in neue Zeile $ServerRow eingetragen."
                     break
                 }
