@@ -289,9 +289,9 @@ try {
             $DCIM_PhysicalDiskView = $xmlContent.SelectNodes('//INSTANCE[@CLASSNAME="DCIM_PhysicalDiskView"]')
             $PhysicalDisks = foreach ($disk in $DCIM_PhysicalDiskView) {
                 [PSCustomObject]@{
-                    Device              = $disk.Property.Where({ $_.Name -eq 'Model' }).Value
+                    Device              = $disk.Property.Where({ $_.Name -eq 'Model' }).Value.Trim()
                     Slot                = $disk.Property.Where({ $_.Name -eq 'DeviceDescription' }).Value
-                    DiskType            = $disk.Property.Where({ $_.Name -eq 'Model' }).Value
+                    DiskType            = $disk.Property.Where({ $_.Name -eq 'Model' }).Value.Trim()
                     Serialnumber        = $disk.Property.Where({ $_.Name -eq 'SerialNumber' }).Value
                     SasAddress          = $disk.Property.Where({ $_.Name -eq 'SASAddress' }).Value
                 }
